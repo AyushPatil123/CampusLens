@@ -52,7 +52,10 @@ def test_gemini_provider_uses_distinct_retrieval_tasks_and_cited_prompt():
 
     assert provider.embed_documents(["policy text", "other text"]) == [[1.0, 0.0], [1.0, 0.0]]
     assert provider.embed_query("deadline") == [1.0, 0.0]
-    assert [call[2].task_type for call in models.embed_calls] == ["RETRIEVAL_DOCUMENT", "RETRIEVAL_QUERY"]
+    assert provider.embed_queries(["deadline one", "deadline two"]) == [[1.0, 0.0], [1.0, 0.0]]
+    assert [call[2].task_type for call in models.embed_calls] == [
+        "RETRIEVAL_DOCUMENT", "RETRIEVAL_QUERY", "RETRIEVAL_QUERY",
+    ]
     assert all(call[2].output_dimensionality == 768 for call in models.embed_calls)
     answer = provider.answer("When is the deadline?", [{"title": "Rules", "page": 2, "text": "August 15"}])
     assert "[1]" in answer

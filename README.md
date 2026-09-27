@@ -4,6 +4,12 @@ A citation-backed university document assistant. The backend ingests text PDFs a
 
 See [PLAN.md](PLAN.md) for the step-by-step build checklist and completion checks.
 
+M3 uses a fixed [retrieval question set](eval/questions.jsonl) and separate [page labels](eval/labels.jsonl). On 50 answerable questions from the 33-document Berkeley memo corpus, hybrid search measured Hit@5 of 50/50 and MRR@10 of 0.9367, versus keyword MRR@10 of 0.9133. These are retrieval metrics, not answer or citation accuracy. See [the evaluation record](docs/evaluation.md) for the full comparison and limits.
+
+## Backend layout
+
+`app/main.py` creates the FastAPI app and wires dependencies. `app/routes.py` declares HTTP endpoints and `app/schemas.py` defines their request and response shapes. `app/services.py` coordinates ingestion and cited answers; `app/model_gateway.py` selects the model provider and translates its failures. `app/documents.py` extracts and chunks files, `app/store.py` owns SQLite document storage, and `app/retrieval.py` ranks embedding and FTS5 results. This keeps the retrieval logic in one place for the M3 comparisons.
+
 ## Run the backend
 
 Requires Python 3.10+, [uv](https://docs.astral.sh/uv/), and a Gemini API key (or an OpenAI API key if you select that provider). From `backend/`:
@@ -45,7 +51,18 @@ uv run --no-sync python -m scripts.inspect_corpus
 uv run --no-sync python -m scripts.ingest_corpus
 ```
 
-The command downloads only the 33 listed official PDFs, rejects redirects to other hosts and files above the API's 10 MB limit, and uploads each with source metadata. It compares downloaded SHA-256 values with `GET /documents`: unchanged files skip embedding, changed files replace their existing document ID. A failed download or upload is reported and makes the command exit nonzero; rerun it after resolving the error. For a small paid smoke test, use `--limit 1`. `scripts.inspect_corpus --all` checks every PDF's extractable pages without calling the model. Public sources may change after the manifest's retrieval date; the command records the bytes it receives at run time through their indexed hashes.
+The command downloads only the 33 listed official PDFs, rejects redirects to other hosts and files above the API's 10 MB limit, and uploads each with source metadata. It compares downloaded SHA-256 values with `GET /documents`: unchanged files skip embedding, changed files replace their existing document ID. Uploads are spaced four seconds apart by default, and HTTP 429 responses receive two bounded retries. A repeated rate limit stops the run; rerun later to resume from indexed hashes. Override pacing with `--upload-delay` and retries with `--rate-limit-retries`. Other failed downloads or uploads are reported and make the command exit nonzero. For a small paid smoke test, use `--limit 1`. `scripts.inspect_corpus --all` checks every PDF's extractable pages without calling the model. Public sources may change after the manifest's retrieval date; the command records the bytes it receives at run time through their indexed hashes.
+
+## Retrieval evaluation (M3)
+
+After recreating the corpus with the M2 ingestion workflow, run from `backend/` against the default database:
+
+```powershell
+uv run --no-sync python -m scripts.validate_eval --db data/campuslens.sqlite3
+uv run --no-sync python -m scripts.evaluate_retrieval --db data/campuslens.sqlite3
+```
+
+The evaluation checks document hashes against [the fixed snapshot](eval/corpus_snapshot.json), compares keyword, dense, and hybrid rankings, and writes [detailed results](eval/baseline_results.json). It embeds 60 questions on the first run and caches the vectors in ignored `backend/data/`; later runs reuse them. The [evaluation record](docs/evaluation.md) defines the metrics, reports local retrieval latency, and reviews weaker cases. Rebuilding from changed public PDFs or a different embedding profile requires a new snapshot and labels before comparing scores.
 
 ## Live PDF smoke test
 

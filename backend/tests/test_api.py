@@ -49,6 +49,8 @@ def test_keyword_signal_finds_exact_policy_code(tmp_path: Path):
     results = store.search("AB123", [1.0, 0.0])
     assert results[0]["document_id"] == target["id"]
     assert results[0]["page"] == 3
+    assert store.search("AB123", [], mode="keyword")[0]["document_id"] == target["id"]
+    assert store.search("AB123", [1.0, 0.0], mode="dense")[0]["filename"] == "general.txt"
     assert store.delete(target["id"])
     assert all(result["document_id"] != target["id"] for result in store.search("AB123", [1.0, 0.0]))
 

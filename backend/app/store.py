@@ -1,17 +1,9 @@
 import json
-import math
-import re
 import sqlite3
 from pathlib import Path
 from uuid import uuid4
 
-
-def cosine(left: list[float], right: list[float]) -> float:
-    numerator = sum(a * b for a, b in zip(left, right))
-    left_norm = math.sqrt(sum(value * value for value in left))
-    right_norm = math.sqrt(sum(value * value for value in right))
-    return numerator / (left_norm * right_norm) if left_norm and right_norm else 0.0
-
+from .retrieval import RetrievalMode, search_chunks
 
 class Store:
     def __init__(self, path: Path):
@@ -181,50 +173,7 @@ class Store:
     def search(
         self, question: str, query_embedding: list[float], limit: int = 5,
         institution: str | None = None, document_ids: list[str] | None = None,
+        mode: RetrievalMode = "hybrid",
     ) -> list[dict]:
         with self.connect() as db:
-            conditions = []
-            parameters: list[str] = []
-            if institution is not None:
-                conditions.append("d.institution = ?")
-                parameters.append(institution)
-            if document_ids is not None:
-                if not document_ids:
-                    return []
-                conditions.append("d.id IN (" + ",".join("?" for _ in document_ids) + ")")
-                parameters.extend(document_ids)
-            where = " WHERE " + " AND ".join(conditions) if conditions else ""
-            rows = db.execute(
-                """SELECT c.id, c.page, c.text, c.embedding, d.id AS document_id,
-                          d.filename, COALESCE(d.title, d.filename) AS title,
-                          d.source_url, d.institution, d.published_or_updated_date
-                   FROM chunks c JOIN documents d ON d.id = c.document_id""" + where,
-                parameters,
-            ).fetchall()
-            if not rows:
-                return []
-            records = {row["id"]: dict(row) for row in rows}
-            dense = sorted(rows, key=lambda row: cosine(query_embedding, json.loads(row["embedding"])), reverse=True)[:20]
-            terms = list(dict.fromkeys(re.findall(r"\w+", question.lower())))[:20]
-            lexical = []
-            if terms:
-                expression = " OR ".join('"' + term + '"' for term in terms)
-                lexical = db.execute(
-                    """SELECT chunks_fts.chunk_id FROM chunks_fts
-                       JOIN chunks c ON c.id = chunks_fts.chunk_id
-                       JOIN documents d ON d.id = c.document_id
-                       WHERE chunks_fts MATCH ?""" +
-                    (" AND " + " AND ".join(conditions) if conditions else "") +
-                    " ORDER BY bm25(chunks_fts) LIMIT 20",
-                    [expression, *parameters],
-                ).fetchall()
-            scores: dict[str, float] = {}
-            for rank, row in enumerate(dense, 1):
-                scores[row["id"]] = scores.get(row["id"], 0) + 1 / (60 + rank)
-            for rank, row in enumerate(lexical, 1):
-                scores[row["chunk_id"]] = scores.get(row["chunk_id"], 0) + 1 / (60 + rank)
-            ids = sorted(scores, key=scores.get, reverse=True)[:limit]
-            return [
-                {key: value for key, value in records[chunk_id].items() if key != "embedding"}
-                for chunk_id in ids
-            ]
+            return search_chunks(db, question, query_embedding, limit, institution, document_ids, mode)

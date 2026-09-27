@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import time
 from datetime import date
 from pathlib import Path
 from urllib.parse import urlparse
@@ -57,11 +58,15 @@ def download_pdf(client: httpx.Client, url: str) -> bytes:
     return bytes(data)
 
 
-def sync_corpus(entries: list[dict], api: httpx.Client, source: httpx.Client, cache_dir: Path) -> dict:
+def sync_corpus(
+    entries: list[dict], api: httpx.Client, source: httpx.Client, cache_dir: Path,
+    upload_delay: float = 0, rate_limit_retries: int = 0,
+) -> dict:
     response = api.get("/documents")
     response.raise_for_status()
     indexed = {document["source_url"]: document for document in response.json() if document["source_url"]}
     counts = {"added": 0, "replaced": 0, "unchanged": 0, "failed": 0}
+    last_upload = 0.0
     for entry in entries:
         url = entry["source_url"]
         try:
@@ -90,7 +95,17 @@ def sync_corpus(entries: list[dict], api: httpx.Client, source: httpx.Client, ca
                 form["published_or_updated_date"] = entry["published_or_updated_date"]
             endpoint = f"/documents/{old['id']}" if old else "/documents"
             method = api.put if old else api.post
-            result = method(endpoint, data=form, files={"file": (filename, data, "application/pdf")})
+            for attempt in range(rate_limit_retries + 1):
+                delay = upload_delay - (time.monotonic() - last_upload)
+                if delay > 0:
+                    time.sleep(delay)
+                result = method(endpoint, data=form, files={"file": (filename, data, "application/pdf")})
+                last_upload = time.monotonic()
+                if result.status_code != 429 or attempt == rate_limit_retries:
+                    break
+                wait = min(30 * (attempt + 1), 60)
+                print(f"rate limited; retrying {entry['title']} in {wait}s", flush=True)
+                time.sleep(wait)
             result.raise_for_status()
             action = "replaced" if old else "added"
             counts[action] += 1
@@ -101,6 +116,9 @@ def sync_corpus(entries: list[dict], api: httpx.Client, source: httpx.Client, ca
         except (httpx.HTTPError, ValueError, OSError) as exc:
             counts["failed"] += 1
             print(f"failed {entry['title']}: {exc}")
+            if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 429:
+                print("Stopping after repeated rate limits; rerun to resume from indexed hashes")
+                break
     return counts
 
 
@@ -110,6 +128,8 @@ def main() -> int:
     parser.add_argument("--api-url", default="http://127.0.0.1:8000")
     parser.add_argument("--cache-dir", type=Path, default=Path("data/corpus"))
     parser.add_argument("--limit", type=int, help="Index only the first N entries for a smoke test")
+    parser.add_argument("--upload-delay", type=float, default=4, help="Minimum seconds between uploads (default: 4)")
+    parser.add_argument("--rate-limit-retries", type=int, default=2, help="Retries after HTTP 429 (default: 2)")
     parser.add_argument("--check", action="store_true", help="Validate the manifest without downloading")
     args = parser.parse_args()
     entries = load_manifest(args.manifest)
@@ -120,11 +140,16 @@ def main() -> int:
         if args.limit < 1:
             parser.error("--limit must be positive")
         entries = entries[:args.limit]
+    if args.upload_delay < 0 or args.rate_limit_retries < 0:
+        parser.error("--upload-delay and --rate-limit-retries must be nonnegative")
     truststore.inject_into_ssl()
     with httpx.Client(base_url=args.api_url, timeout=120) as api, httpx.Client(
         timeout=60, headers={"User-Agent": "Mozilla/5.0 (compatible; CampusLens/0.1)"}
     ) as source:
-        counts = sync_corpus(entries, api, source, args.cache_dir)
+        counts = sync_corpus(
+            entries, api, source, args.cache_dir,
+            upload_delay=args.upload_delay, rate_limit_retries=args.rate_limit_retries,
+        )
     print(json.dumps(counts, sort_keys=True))
     return 1 if counts["failed"] else 0
 

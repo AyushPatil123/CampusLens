@@ -186,3 +186,33 @@ def test_corpus_sync_adds_skips_and_replaces_by_source_hash(tmp_path):
     assert updated["id"] == first["id"]
     assert updated["sha256"] != first["sha256"]
     assert Store(tmp_path / "corpus.sqlite3").search("September", [1.0, 1.0])[0]["page"] == 3
+
+
+def test_corpus_sync_retries_rate_limited_upload(tmp_path, monkeypatch):
+    url = "https://grad.berkeley.edu/wp-content/uploads/archive/policy.pdf"
+    entry = {
+        "title": "Graduate Policy", "source_url": url,
+        "institution": "University of California, Berkeley",
+        "published_or_updated_date": "2022-01-01", "file_type": "pdf", "retrieved_at": "2026-09-27",
+    }
+    source = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(
+        200, content=make_pdf(), request=request,
+    )))
+    client = TestClient(create_app(Settings(db_path=tmp_path / "retry.sqlite3"), FakeProvider()))
+
+    class RateLimitedOnce:
+        calls = 0
+
+        def get(self, *args, **kwargs):
+            return client.get(*args, **kwargs)
+
+        def post(self, *args, **kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                return httpx.Response(429, request=httpx.Request("POST", "http://testserver/documents"))
+            return client.post(*args, **kwargs)
+
+    monkeypatch.setattr("scripts.ingest_corpus.time.sleep", lambda seconds: None)
+    api = RateLimitedOnce()
+    assert sync_corpus([entry], api, source, tmp_path / "cache", rate_limit_retries=1)["added"] == 1
+    assert api.calls == 2

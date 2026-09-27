@@ -9,6 +9,7 @@ from openai import AuthenticationError, BadRequestError, OpenAI, OpenAIError, Ra
 
 class ModelProvider(Protocol):
     def embed_documents(self, texts: list[str]) -> list[list[float]]: ...
+    def embed_queries(self, texts: list[str]) -> list[list[float]]: ...
     def embed_query(self, text: str) -> list[float]: ...
     def answer(self, question: str, sources: list[dict]) -> str: ...
 
@@ -71,7 +72,10 @@ class OpenAIProvider:
         return [item.embedding for item in sorted(result.data, key=lambda item: item.index)]
 
     def embed_query(self, text: str) -> list[float]:
-        return self.embed_documents([text])[0]
+        return self.embed_queries([text])[0]
+
+    def embed_queries(self, texts: list[str]) -> list[list[float]]:
+        return self.embed_documents(texts)
 
     def answer(self, question: str, sources: list[dict]) -> str:
         context = format_sources(sources)
@@ -119,7 +123,10 @@ class GeminiProvider:
         return self._embed(texts, "RETRIEVAL_DOCUMENT")
 
     def embed_query(self, text: str) -> list[float]:
-        return self._embed([text], "RETRIEVAL_QUERY")[0]
+        return self.embed_queries([text])[0]
+
+    def embed_queries(self, texts: list[str]) -> list[list[float]]:
+        return self._embed(texts, "RETRIEVAL_QUERY")
 
     def answer(self, question: str, sources: list[dict]) -> str:
         try:

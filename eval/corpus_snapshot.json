@@ -1,0 +1,138 @@
+{
+  "indexed_at": "2026-09-27",
+  "embedding_profile": "gemini:gemini-embedding-001:768",
+  "sources": [
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/Memo-announcing-HDC-policy-changes_FINAL_8.29.19.pdf",
+      "sha256": "0da8e4547a524b2ed4b3935919083345cb5b77e8a53a98a0fa0084ea7e583a4e"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/060622_AdmissionsPolicyChangeMemo-1-1.pdf",
+      "sha256": "343702deebf5f0d754df7f7b64d66b37a17dd774182e7417b3b64ac80013dd2e"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/Admissions-Comp-Review-Memo_Dec-2017.pdf",
+      "sha256": "56b9457a3aedf10a4096ca0eebf370daa216382bb207eced3e66fbbda963fefa"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/Admissions-Comp-Review-Memo_December-2016.pdf",
+      "sha256": "f333d054e79b68156f66dce03851f25a7797c21eb030a53d49551781563ae5c0"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/Admissions-Policy-for-Former-or-Current-Berkeley-Students-MEMO-2016-April-18-signed.pdf",
+      "sha256": "5657a1427036dbbe7fb5aebfd3ffb0dfbe20edc0fefc23b6878e3478a297923d"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/Changes-to-Lapsing-of-Candidacy-Procedures-for-Doctoral-Students-MEMO-2016-April-8.pdf",
+      "sha256": "f82b22cde2fde8bcf72b58242a0efce4f57a0eff0203f307e624e8d85b12c772"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/Comprehensive-Evaluation-and-Role-of-GRE-memo-December_14_2015-1.pdf",
+      "sha256": "1b5f5ae2259fc6211cf0876e0d11d8ae21cefa20c12edb66543f53a436351477"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/Comprehensive-Review-of-Applicants-for-Graduate-Admission-and-Fellowship-Nominations_2020-November.pdf",
+      "sha256": "9c08e7bd4bbbd1a3864ac1aefbe2c3b5217b573c60da5c31c1c1e6c8cb46bde6"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/Conferral-of-Graduate-Degrees-in-Summer-MEMO-2015-April-8.pdf",
+      "sha256": "bdc17be3ab2ac41d5110b137759f405aa241b05d4bd9bd8335c37c96cd4cbbd0"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/Counting-Units-Different-Degrees_FINAL.pdf",
+      "sha256": "9b65bc92303016300d1c4c82f6fee51b24223ef2a44ff71a9914df2855fa8ea0"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/Dissertation-Embargo-Policy-MEMO-2013-December-21.pdf",
+      "sha256": "9fa687a49edbd6108870709211f4fab159d1c7288ec11fbe1d64ca8a48536f30"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/Filing-Fee-MEMO-2015-April-8.pdf",
+      "sha256": "ebde2cc183db1142b1535d29109ea7c93a36d5c162088961c48c3267e588a618"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/Filing-Fees-for-Graduate-Degree-Conferral-in-Summer-MEMO-2015-April-8.pdf",
+      "sha256": "da1bff851ba3618a2e8a1b9137a1afa97444edbb7f2b6d49b7fff00cddda1d4d"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/GSR-appts-in-Self-Supporting-Degree-Programs-MEMO-2015-4-6.pdf",
+      "sha256": "dde2abcc3d489f1b7d944d2bd257899172f0122d3205ec0544d17829984311a3"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/Graduate-Admissions-Deferral-Policy_Fall-2018.pdf",
+      "sha256": "4145f722f27d3b57704e6fdbfb230be69c68743709e9c088b107ca8b7a46dd45"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/Graduate-Council-Revision-to-DCF-Policy-MEMO-2016-May-17.pdf",
+      "sha256": "d620e215704d53ae7e79ff0fcc2a58c73be74e7a3becfaa6e52cb2a9d3b83965"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/In-Absentia-Policy-Memo-1-18-22.pdf",
+      "sha256": "c85452e7a74e8ff95623e6d032a41af1ce99a071ff42a1fc65bc27a1f328c45d"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/Joint-Authorship-Policy-Memo-1-27-22.pdf",
+      "sha256": "d334f4f7d0cb9332a8b889e8c15c4e2c74dd0315f470436bb3d6fea11850b546"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/MEMO-InAbsentia-12-6-2013.pdf",
+      "sha256": "840aa23ab3071f904b6e652590ae848e8652223ecc8597c198310c3d7a1ed088"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/MEMO27Sept2013OnlineAPR.pdf",
+      "sha256": "467a69598d6785629511c7f629fee989a5c0227e64e9d8488a84179da47dbd74"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/Memo-Deferral-of-Admission-2014-7-23.pdf",
+      "sha256": "b32176c6bcb9a527edca0a3426ade648c95380f5f838469e1d75fd7dd51c5782"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/Memo-TOEFL-Scores-2014-7-10.pdf",
+      "sha256": "4545fbc619edcb541edfb5d0b312688a49803db2f37cb540749e84bbc4e7a056"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/Policy-Clarification-on-Filing-Fee-and-University-Funds-MEMO-2016-October-28.pdf",
+      "sha256": "d117a6d8841f1872380f1c655c87f231a7999c4a93925f820ee224e7d5ff2e93"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/Revised-Oral-English-Proficiency-Policy-for-Prospective-GSIs-Approved-by-Graduate-Council-Mar.-7-2022-.pdf",
+      "sha256": "cc3ef3a2d9e8d8d7b07e06009e5fd447770ae79fe658aeae4ab9fc37afd0ccb3"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/Revision-to-Enrollment-Requirement-for-Plan-II-Masters-Students-to-File-for-Summer-Degree-April-2021.pdf",
+      "sha256": "d617cd1b9e31453d374c40b69290d75322bab62bf5aa191839181d1ff9f775ce"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/Revisions-to-Doctoral-Completion-Fellowship-eligibility-and-stipend-cap-policy-January-2021.pdf",
+      "sha256": "a1e92a13a394675e50f74be02f9cb7aaf22f93aeb924402eaaa786fef56b692a"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/Revisions-to-Graduate-Council-Policies-for-Qualifying-Exams-and-Dissertation-Committees-MEMO-2016-March-8-2.pdf",
+      "sha256": "7b9b5fa0d54dca4f4497ae4d8e70973f24490776fadc38f4f411500cc34a5de3"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/Stipend-limits-to-Grad-Div-Fellowships-Memo-2015-February-11.docx.pdf",
+      "sha256": "c6cfe5504041596d2edb9ee30e63c4b02e0b22a5c8d429a6ef255762e91150bc"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/Summer-enrollment-degree-filing_FINAL.pdf",
+      "sha256": "f0275e4e1b04e7994f01392a9fd28f60b8b326b7b11166188b1b90966938f015"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/UGSI-Appointment-Policy.pdf",
+      "sha256": "333ce206f7c945ce692592dbd25693dd07dcc71bd07cedbd406d48c876be80e4"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/combining-multi-years-may-2018.pdf",
+      "sha256": "6df856d76e6d219e1ec635785d2d0998bbdd21d0e636ce6712e5b08d92a4a6c9"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/gc_policy_on_appt_and_mentoring_gsis.pdf",
+      "sha256": "7db6432ac28a521034822279f61fa7d9d77d23e96af8b01a287ce56c05551041"
+    },
+    {
+      "source_url": "https://grad.berkeley.edu/wp-content/uploads/archive/stipend-and-work-limits-may-2018.pdf",
+      "sha256": "1b16d3877612f8d1487cd317dc919010d6d8e5fd841c5c8fd404f6842100917e"
+    }
+  ]
+}
