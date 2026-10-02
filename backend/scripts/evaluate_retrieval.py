@@ -16,7 +16,7 @@ from scripts.ingest_corpus import DEFAULT_MANIFEST, load_manifest
 from scripts.validate_eval import DEFAULT_EVAL, read_jsonl, validate
 
 
-MODES = ("keyword", "dense", "hybrid")
+MODES = ("keyword", "dense", "hybrid", "hybrid_diverse")
 
 
 def percentile(values: list[float], percent: float) -> float:
@@ -81,10 +81,13 @@ def query_vectors(
     return cache["vectors"]
 
 
-def run_evaluation(store: Store, questions: list[dict], labels: list[dict], vectors: dict) -> dict:
+def run_evaluation(
+    store: Store, questions: list[dict], labels: list[dict], vectors: dict,
+    modes: tuple[str, ...] = MODES,
+) -> dict:
     gold = {label["id"]: label for label in labels}
     output = {}
-    for mode in MODES:
+    for mode in modes:
         rows = []
         durations = []
         for item in questions:
@@ -133,6 +136,7 @@ def main() -> int:
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--embed-delay", type=float, default=4)
     parser.add_argument("--rate-limit-retries", type=int, default=2)
+    parser.add_argument("--modes", nargs="+", choices=MODES, default=list(MODES))
     args = parser.parse_args()
     if args.batch_size < 1 or args.embed_delay < 0 or args.rate_limit_retries < 0:
         parser.error("Batch size must be positive; delay and retries must be nonnegative")
@@ -149,7 +153,7 @@ def main() -> int:
     vectors = query_vectors(
         questions, settings, args.cache, args.batch_size, args.embed_delay, args.rate_limit_retries,
     )
-    results = run_evaluation(Store(args.db), questions, labels, vectors)
+    results = run_evaluation(Store(args.db), questions, labels, vectors, tuple(args.modes))
     report = {
         "evaluated_at": datetime.now().astimezone().isoformat(),
         "embedding_profile": settings.embedding_profile,
@@ -160,7 +164,7 @@ def main() -> int:
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    for mode in MODES:
+    for mode in args.modes:
         print(mode, json.dumps(results[mode]["summary"], sort_keys=True))
     print("Detailed results:", args.output)
     return 0

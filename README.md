@@ -1,8 +1,6 @@
 # CampusLens
 
-A citation-backed university document assistant. The backend ingests text PDFs and UTF-8 text files, searches page-aware chunks with semantic and keyword retrieval, and answers with numbered source excerpts.
-
-See [PLAN.md](PLAN.md) for the step-by-step build checklist and completion checks.
+A citation-backed university document assistant. The backend ingests text PDFs and UTF-8 text files, searches page-aware chunks with semantic and keyword retrieval, and answers with numbered source excerpts. The React demo lets visitors ask questions and open the cited page evidence.
 
 M3 uses a fixed [retrieval question set](eval/questions.jsonl) and separate [page labels](eval/labels.jsonl). On 50 answerable questions from the 33-document Berkeley memo corpus, hybrid search measured Hit@5 of 50/50 and MRR@10 of 0.9367, versus keyword MRR@10 of 0.9133. These are retrieval metrics, not answer or citation accuracy. See [the evaluation record](docs/evaluation.md) for the full comparison and limits.
 
@@ -63,6 +61,34 @@ uv run --no-sync python -m scripts.evaluate_retrieval --db data/campuslens.sqlit
 ```
 
 The evaluation checks document hashes against [the fixed snapshot](eval/corpus_snapshot.json), compares keyword, dense, and hybrid rankings, and writes [detailed results](eval/baseline_results.json). It embeds 60 questions on the first run and caches the vectors in ignored `backend/data/`; later runs reuse them. The [evaluation record](docs/evaluation.md) defines the metrics, reports local retrieval latency, and reviews weaker cases. Rebuilding from changed public PDFs or a different embedding profile requires a new snapshot and labels before comparing scores.
+
+## Answer and citation evaluation (M4)
+
+The [fixed answer sample](eval/answer_sample.json) has 30 questions, including all ten no-answer cases. [The rubric](docs/answer-evaluation.md) scores factual support, completeness, citation correctness, and refusal separately. After rebuilding the matching index, run from `backend/`:
+
+```powershell
+uv run --no-sync python -m scripts.evaluate_answers --db data/campuslens.sqlite3
+uv run --no-sync python -m scripts.summarize_answer_review
+```
+
+The first command uses cached M3 query embeddings and the production answer service. It resumes completed IDs from ignored `backend/data/answer_baseline.jsonl`. Full cited excerpts stay in that ignored local file; [manual judgments](eval/answer_review.jsonl) contain concise reasons without redistributing source text. The baseline run saved and reviewed 26 of 30 answers across September 27 and October 2. All 20 answerable cases have been reviewed; four no-answer cases remain because of the selected Gemini model's daily free-tier generation limit. `/ask` now caps hybrid context at two chunks per document after a measured two-document coverage failure. The baseline runner stays on the original `hybrid` mode; pass `--retrieval-mode hybrid_diverse --output data/answer_diverse.jsonl` to evaluate the revised mode into a separate file. See [the answer evaluation record](docs/answer-evaluation.md) for measured retrieval changes, partial answer counts, and remaining work.
+
+## Demo interface (M5)
+
+The [React and TypeScript frontend](frontend/) shows answers with clickable citation numbers, source title, PDF page, excerpt, and original URL. It also supports document upload, selection, listing, and deletion. Empty, loading, error, and unsupported-answer states are shown in the interface. The initial corpus is historical Berkeley memos; the interface and API accept documents from other institutions.
+
+Use Node.js 22.12+ and npm. Start the backend as described above, then run this in a second terminal from `frontend/`:
+
+```powershell
+npm ci
+npm run dev
+```
+
+Open <http://127.0.0.1:5173/>. Vite proxies `/api` to the FastAPI server at `http://127.0.0.1:8000`, so no frontend API key is needed. If you host the frontend separately, set `VITE_API_BASE_URL` to the backend's public base URL and configure backend CORS accordingly. Do not put provider keys in frontend environment variables. Uploading and asking live questions use the selected provider's quota.
+
+If npm on this Windows machine reports `UNABLE_TO_VERIFY_LEAF_SIGNATURE`, the local ignored `backend/data/npm-ca-bundle.pem` generated from Windows trusted roots can be used in that terminal before `npm ci`: `$env:NODE_EXTRA_CA_CERTS=(Resolve-Path ../backend/data/npm-ca-bundle.pem).Path`. Keep certificate verification enabled.
+
+Run `npm run build` for a production bundle and `npm run smoke` for a browser smoke test using Microsoft Edge. The smoke test mocks API responses so it does not spend model quota; it checks desktop and mobile widths, keyboard navigation, citation links, document filters and management, refusal, loading, error, and empty states. Set `CAMPUSLENS_BROWSER` to another Chromium executable path if Edge is unavailable. A local proxy check also returned `ok` from `/api/health` and loaded all 33 indexed documents from the existing backend without calling the model.
 
 ## Live PDF smoke test
 

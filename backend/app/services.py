@@ -10,6 +10,7 @@ from .config import Settings
 from .documents import chunk_pages, extract_pages
 from .errors import ServiceError
 from .model_gateway import ModelGateway
+from .retrieval import RetrievalMode
 from .store import Store
 
 
@@ -79,7 +80,11 @@ class DocumentService:
             return self.store.replace(document_id, filename, sha256, chunks, embeddings, **metadata)
         return self.store.add(filename, sha256, chunks, embeddings, **metadata)
 
-    def ask(self, question: str, institution: str | None = None, document_ids: list[str] | None = None) -> dict:
+    def ask(
+        self, question: str, institution: str | None = None,
+        document_ids: list[str] | None = None,
+        retrieval_mode: RetrievalMode = "hybrid_diverse",
+    ) -> dict:
         if not self.store.list_documents():
             return {"answer": "Upload a document first.", "citations": []}
         if self.store.embedding_profiles() != {self.settings.embedding_profile}:
@@ -88,12 +93,14 @@ class DocumentService:
             )
         sources = self.store.search(
             question, self.models.call("embed_query", question),
-            institution=institution, document_ids=document_ids,
+            institution=institution, document_ids=document_ids, mode=retrieval_mode,
         )
         if not sources:
             return {"answer": "I could not find that in the uploaded documents.", "citations": []}
         answer = self.models.call("answer", question, sources)
         used = {int(number) for number in re.findall(r"\[(\d+)\]", answer)}
+        if any(number < 1 or number > len(sources) for number in used):
+            return {"answer": "I could not verify an answer from the uploaded documents.", "citations": []}
         citations = [
             {"number": index, "document_id": source["document_id"], "filename": source["filename"],
              "title": source["title"], "source_url": source["source_url"],

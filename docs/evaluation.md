@@ -64,3 +64,9 @@ I inspected the ranked chunks for ten distinct questions where at least one mode
 | Q048 | Dense and hybrid top five omit the 2015 filing-fee policy: several chunks from the 2016 clarification fill the slots. Repeated chunks crowd out a required document. |
 
 The reviewed sources and gold pages are indexed, so these examples provide no evidence of an extraction failure or a missing source. Five labels allow two alternative pages after checking that both pages contain the same required fact; this prevents treating a valid page as a false miss. The remaining coverage issue suggests testing page diversity or date-aware source selection before adding an expensive reranker. A reranker is not justified by this baseline: it cannot repair the missing second source if only the crowded top five chunks are passed to it. M4 will measure whether these ranking errors actually affect answer support and citation correctness.
+
+## Answer review status
+
+M4's [rubric, sample, partial counts, and quota limitation](answer-evaluation.md) are tracked separately. The M3 retrieval numbers above do not measure whether generated answers are supported or whether cited excerpts prove their claims.
+
+The M4 Q048 failure motivated a separate `hybrid_diverse` mode that caps context at two chunks per document. In a [matched rerun](../eval/diversity_results.json) on 2026-10-02, both original hybrid and diverse hybrid had 50/50 Hit@5 and 0.9367 MRR@10; two-document coverage rose from 7/8 to 8/8. Same-run p50 retrieval was 241.279 ms versus 226.343 ms, respectively. These timing values are much higher than the earlier local run, so the data support a coverage improvement but not a stable latency claim. `/ask` now uses diverse hybrid; the fixed answer baseline remains pinned to original hybrid for the eventual before/after comparison.

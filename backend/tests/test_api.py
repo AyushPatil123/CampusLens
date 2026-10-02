@@ -36,6 +36,18 @@ def test_upload_ask_and_delete(tmp_path: Path):
     assert client.post("/ask", json={"question": "When is tuition due?"}).json()["citations"] == []
 
 
+def test_ask_rejects_unmapped_source_number(tmp_path: Path):
+    class WrongNumberProvider(FakeProvider):
+        def answer(self, question, sources):
+            return "Tuition is due on August 15 [1]. The fee is $100 [99]."
+
+    client = TestClient(create_app(Settings(db_path=tmp_path / "wrong-number.sqlite3"), WrongNumberProvider()))
+    client.post("/documents", files={"file": ("policy.txt", b"Tuition is due on August 15.")})
+    response = client.post("/ask", json={"question": "When is tuition due?"})
+    assert response.status_code == 200
+    assert response.json() == {"answer": "I could not verify an answer from the uploaded documents.", "citations": []}
+
+
 def test_rejects_empty_and_wrong_format(tmp_path: Path):
     client = TestClient(create_app(Settings(db_path=tmp_path / "test.sqlite3"), FakeProvider()))
     assert client.post("/documents", files={"file": ("image.png", b"abc")}).status_code == 415
@@ -63,6 +75,35 @@ def test_search_filters_restrict_dense_and_keyword_candidates(tmp_path: Path):
     assert [row["document_id"] for row in store.search("AB123", [1.0], document_ids=[other["id"]])] == [other["id"]]
     assert store.search("AB123", [1.0], document_ids=[]) == []
     assert store.search("AB123", [1.0], institution="Berkeley", document_ids=[other["id"]]) == []
+
+
+def test_diverse_hybrid_limits_repeated_chunks_per_document(tmp_path: Path):
+    store = Store(tmp_path / "diverse.sqlite3")
+    first = store.add("first.txt", "first", [(1, "Policy filing fee.")] * 4, [[1.0]] * 4)
+    second = store.add("second.txt", "second", [(1, "Policy filing fee clarification.")], [[1.0]])
+    results = store.search("filing fee policy", [1.0], limit=5, mode="hybrid_diverse")
+    assert len(results) == 3
+    assert sum(row["document_id"] == first["id"] for row in results) == 2
+    assert sum(row["document_id"] == second["id"] for row in results) == 1
+
+
+def test_ask_uses_diverse_context_by_default(tmp_path: Path):
+    class CapturingProvider(FakeProvider):
+        def answer(self, question, sources):
+            self.sources = sources
+            return "The policy has an answer [1]."
+
+    settings = Settings(db_path=tmp_path / "ask-diverse.sqlite3")
+    store = Store(settings.db_path)
+    first = store.add("first.txt", "first", [(1, "Policy filing fee.")] * 4,
+                      [[1.0, 0.0]] * 4, embedding_profile=settings.embedding_profile)
+    second = store.add("second.txt", "second", [(1, "Policy filing fee clarification.")],
+                       [[1.0, 0.0]], embedding_profile=settings.embedding_profile)
+    provider = CapturingProvider()
+    response = TestClient(create_app(settings, provider)).post("/ask", json={"question": "What is the filing fee policy?"})
+    assert response.status_code == 200
+    assert len(provider.sources) == 3
+    assert {row["document_id"] for row in provider.sources} == {first["id"], second["id"]}
 
 
 def test_ask_filters_citations_by_institution_and_document(tmp_path: Path):

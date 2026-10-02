@@ -7,7 +7,7 @@ import sqlite3
 from typing import Literal
 
 
-RetrievalMode = Literal["keyword", "dense", "hybrid"]
+RetrievalMode = Literal["keyword", "dense", "hybrid", "hybrid_diverse"]
 
 
 def cosine(left: list[float], right: list[float]) -> float:
@@ -22,8 +22,10 @@ def search_chunks(
     institution: str | None = None, document_ids: list[str] | None = None,
     mode: RetrievalMode = "hybrid",
 ) -> list[dict]:
-    if mode not in ("keyword", "dense", "hybrid"):
+    if mode not in ("keyword", "dense", "hybrid", "hybrid_diverse"):
         raise ValueError(f"Unknown retrieval mode: {mode}")
+    if limit <= 0:
+        return []
     conditions = []
     parameters: list[str] = []
     if institution is not None:
@@ -37,7 +39,7 @@ def search_chunks(
     where = " WHERE " + " AND ".join(conditions) if conditions else ""
     records: dict[str, dict] = {}
     dense = []
-    if mode in ("dense", "hybrid"):
+    if mode in ("dense", "hybrid", "hybrid_diverse"):
         rows = db.execute(
             """SELECT c.id, c.page, c.text, c.embedding, d.id AS document_id,
                       d.filename, COALESCE(d.title, d.filename) AS title,
@@ -50,7 +52,7 @@ def search_chunks(
         dense = sorted(rows, key=lambda row: cosine(query_embedding, json.loads(row["embedding"])), reverse=True)[:20]
     lexical = []
     terms = list(dict.fromkeys(re.findall(r"\w+", question.lower())))[:20]
-    if mode in ("keyword", "hybrid") and terms:
+    if mode in ("keyword", "hybrid", "hybrid_diverse") and terms:
         expression = " OR ".join('"' + term + '"' for term in terms)
         lexical = db.execute(
             """SELECT c.id, c.page, c.text, d.id AS document_id,
@@ -70,5 +72,19 @@ def search_chunks(
         scores[row["id"]] = scores.get(row["id"], 0) + 1 / (60 + rank)
     for rank, row in enumerate(lexical, 1):
         scores[row["id"]] = scores.get(row["id"], 0) + 1 / (60 + rank)
-    ids = sorted(scores, key=scores.get, reverse=True)[:limit]
+    ids = sorted(scores, key=scores.get, reverse=True)
+    if mode == "hybrid_diverse":
+        per_document = {}
+        chosen = []
+        for chunk_id in ids:
+            document_id = records[chunk_id]["document_id"]
+            if per_document.get(document_id, 0) >= 2:
+                continue
+            chosen.append(chunk_id)
+            per_document[document_id] = per_document.get(document_id, 0) + 1
+            if len(chosen) == limit:
+                break
+        ids = chosen
+    else:
+        ids = ids[:limit]
     return [records[chunk_id] for chunk_id in ids]
