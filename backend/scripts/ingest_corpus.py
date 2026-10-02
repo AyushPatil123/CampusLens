@@ -61,6 +61,7 @@ def download_pdf(client: httpx.Client, url: str) -> bytes:
 def sync_corpus(
     entries: list[dict], api: httpx.Client, source: httpx.Client, cache_dir: Path,
     upload_delay: float = 0, rate_limit_retries: int = 0,
+    force: bool = False,
 ) -> dict:
     response = api.get("/documents")
     response.raise_for_status()
@@ -73,7 +74,7 @@ def sync_corpus(
             data = download_pdf(source, url)
             digest = hashlib.sha256(data).hexdigest()
             old = indexed.get(url)
-            if old and all((
+            if old and not force and all((
                 old["sha256"] == digest,
                 old["title"] == entry["title"],
                 old["institution"] == entry["institution"],
@@ -131,6 +132,7 @@ def main() -> int:
     parser.add_argument("--upload-delay", type=float, default=4, help="Minimum seconds between uploads (default: 4)")
     parser.add_argument("--rate-limit-retries", type=int, default=2, help="Retries after HTTP 429 (default: 2)")
     parser.add_argument("--check", action="store_true", help="Validate the manifest without downloading")
+    parser.add_argument("--force", action="store_true", help="Re-embed existing manifest documents even when unchanged")
     args = parser.parse_args()
     entries = load_manifest(args.manifest)
     print(f"Manifest valid: {len(entries)} official PDF entries")
@@ -143,12 +145,17 @@ def main() -> int:
     if args.upload_delay < 0 or args.rate_limit_retries < 0:
         parser.error("--upload-delay and --rate-limit-retries must be nonnegative")
     truststore.inject_into_ssl()
-    with httpx.Client(base_url=args.api_url, timeout=120) as api, httpx.Client(
+    import os
+    username = os.getenv("CAMPUSLENS_AUTH_USERNAME", "")
+    password = os.getenv("CAMPUSLENS_AUTH_PASSWORD", "")
+    auth = (username, password) if username and password else None
+    with httpx.Client(base_url=args.api_url, timeout=120, auth=auth) as api, httpx.Client(
         timeout=60, headers={"User-Agent": "Mozilla/5.0 (compatible; CampusLens/0.1)"}
     ) as source:
         counts = sync_corpus(
             entries, api, source, args.cache_dir,
             upload_delay=args.upload_delay, rate_limit_retries=args.rate_limit_retries,
+            force=args.force,
         )
     print(json.dumps(counts, sort_keys=True))
     return 1 if counts["failed"] else 0

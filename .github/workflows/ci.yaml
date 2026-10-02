@@ -1,0 +1,50 @@
+name: Checks
+on: [push, pull_request]
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.8.22"
+          python-version: "3.12"
+      - run: uv sync --frozen --extra dev
+        working-directory: backend
+      - run: uv run --no-sync pytest
+        working-directory: backend
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run lint
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+  containers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose up --build -d --wait
+        env:
+          CAMPUSLENS_AUTH_USERNAME: ci
+          CAMPUSLENS_AUTH_PASSWORD: ci-only-password-123456789
+      - run: |
+          curl --fail http://localhost:8080/health
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/)" = 401
+          curl --fail -u ci:ci-only-password-123456789 http://localhost:8080/
+          curl --fail -u ci:ci-only-password-123456789 http://localhost:8080/api/documents
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8080/api/ask -H 'Content-Type: application/json' -d '{"question":"test question"}')" = 401
+          docker compose exec -T backend uv run --no-sync python -c "from pathlib import Path; from app.store import Store; Store(Path('/data/campuslens.sqlite3')).add('ci.txt', 'ci-hash', [(1, 'CI persistence fixture')], [[1.0]])"
+          docker compose restart backend
+          docker compose up -d --wait
+          curl --fail -u ci:ci-only-password-123456789 http://localhost:8080/api/documents | python -c "import json, sys; assert json.load(sys.stdin)[0]['filename'] == 'ci.txt'"
+      - run: docker compose logs && docker compose down
+        if: always()

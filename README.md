@@ -4,6 +4,51 @@ A citation-backed university document assistant. The backend ingests text PDFs a
 
 M3 uses a fixed [retrieval question set](eval/questions.jsonl) and separate [page labels](eval/labels.jsonl). On 50 answerable questions from the 33-document Berkeley memo corpus, hybrid search measured Hit@5 of 50/50 and MRR@10 of 0.9367, versus keyword MRR@10 of 0.9133. These are retrieval metrics, not answer or citation accuracy. See [the evaluation record](docs/evaluation.md) for the full comparison and limits.
 
+## See the local app
+
+CampusLens is a local portfolio app. There is no hosted demo or public API; run it on your own machine with your own provider key using the setup instructions below.
+
+![CampusLens desktop interface showing a question, answer, and numbered source excerpt](docs/screenshots/desktop.png)
+
+The screenshots use a **fictional policy and fixed API responses** to illustrate the interface. They are not live model outputs or evidence for the evaluation scores. The citation displays its document title, page number, and supporting excerpt. Opening the source link leads to [this fictional source-page illustration](docs/screenshots/source-page.png), rendered as HTML for repeatable capture; a real corpus citation opens the original PDF at the cited page. See the [mobile view](docs/screenshots/mobile.png) as well.
+
+Regenerate all three screenshots from `frontend/` with `npm ci` and `npm run screenshots`. This uses headless Microsoft Edge and makes no provider calls. Set `CAMPUSLENS_BROWSER` to another Chromium executable if needed. The capture script checks citation navigation, source opening, and horizontal overflow.
+
+## Architecture and design choices
+
+```mermaid
+flowchart LR
+    A[Official PDFs or local text uploads] --> B[Extraction with PDF page numbers]
+    B --> C[Chunks: 900 characters / 120 overlap]
+    C --> D[Provider embeddings]
+    C --> E[SQLite FTS5 keyword index]
+    D --> F[SQLite stored vectors and metadata]
+    Q[Question and optional document filters] --> R[Dense + keyword retrieval]
+    E --> R
+    F --> R
+    R --> S[Rank fusion / max two chunks per document]
+    S --> T[Provider answer using numbered evidence]
+    T --> U[React answer / citations / source page links]
+```
+
+PDF page identity and original URLs survive extraction, storage, retrieval, and answer generation so readers can inspect the evidence. SQLite keeps the corpus and both retrieval paths in one persistent store; this 189-chunk corpus does not yet justify a vector database. Keyword retrieval handles exact policy terms, while dense retrieval supports paraphrases. Reciprocal rank fusion combines their rankings. Production context limits repeated chunks from one document after a measured multi-document coverage failure. The API returns a refusal when it cannot verify citation numbers; that check does not prove every claim is supported, which is why answer support is reviewed separately.
+
+## Measured results and limits
+
+The September 27, 2026 baseline used the same 33-document snapshot and 60 fixed questions for every mode. Fifty questions were answerable; ten no-answer questions are excluded from the retrieval relevance metrics.
+
+| Mode | Hit@5 | MRR@10 | Local retrieval p50 | Local retrieval p95 |
+| --- | ---: | ---: | ---: | ---: |
+| Keyword | 50/50 | 0.9133 | 3.956 ms | 5.546 ms |
+| Dense | 50/50 | 0.9290 | 56.728 ms | 67.740 ms |
+| Hybrid baseline | 50/50 | 0.9367 | 58.590 ms | 67.298 ms |
+
+Hybrid improved MRR by 0.0234 over keyword search while adding about 54.6 ms at p50. These single-run local timings exclude query embedding, HTTP, and answer generation. In a separate matched October 2 run, limiting hybrid context to two chunks per document improved two-document coverage from 7/8 to 8/8 without changing Hit@5 or MRR; timing varied substantially between runs. See [the method and weak-case review](docs/evaluation.md) and [raw baseline results](eval/baseline_results.json).
+
+This focused corpus and questions written from known memos limit generalization. PDFs are historical (2013–2022), may be superseded, and are downloaded rather than redistributed. Scans need OCR; retrieval scans stored vectors and has not been load-tested at large scale. Answer evaluation remains incomplete: 26/30 baseline responses are reviewed, with 17/20 answerable responses fully supported and 17/20 with citations supporting every material claim. Six reviewed no-answer cases refused correctly; four remain unrun, and the same-sample revised-answer comparison is on hold for quota. See [the answer rubric and partial findings](docs/answer-evaluation.md). The screenshots demonstrate presentation, not model quality.
+
+[Portfolio notes](docs/portfolio.md) contain a resume bullet based on these measured results, a two-minute explanation of the hybrid-search tradeoff, and a five-minute repository tour.
+
 ## Backend layout
 
 `app/main.py` creates the FastAPI app and wires dependencies. `app/routes.py` declares HTTP endpoints and `app/schemas.py` defines their request and response shapes. `app/services.py` coordinates ingestion and cited answers; `app/model_gateway.py` selects the model provider and translates its failures. `app/documents.py` extracts and chunks files, `app/store.py` owns SQLite document storage, and `app/retrieval.py` ranks embedding and FTS5 results. This keeps the retrieval logic in one place for the M3 comparisons.
@@ -32,7 +77,7 @@ Open <http://127.0.0.1:8000/docs> for the interactive API and its response schem
 | `DELETE /documents/{id}` | Delete a document and its search index entries |
 | `POST /ask` | Ask `{ "question": "When is tuition due?" }` |
 
-Run tests with `uv run --no-sync pytest`. Scanned PDFs need OCR and are rejected if no text can be extracted. This is a local single-user prototype; public deployment needs authentication and request limits.
+Run tests with `uv run --no-sync pytest`. Scanned PDFs need OCR and are rejected if no text can be extracted. Local mode is intended for loopback development. The Compose deployment enables password protection and request limits.
 
 `POST /ask` also accepts optional exact-match `institution` and `document_ids` filters. They constrain both keyword and embedding retrieval before the answer is generated. `GET /documents` includes each file's SHA-256 so the corpus command can skip unchanged files.
 
@@ -89,6 +134,44 @@ Open <http://127.0.0.1:5173/>. Vite proxies `/api` to the FastAPI server at `htt
 If npm on this Windows machine reports `UNABLE_TO_VERIFY_LEAF_SIGNATURE`, the local ignored `backend/data/npm-ca-bundle.pem` generated from Windows trusted roots can be used in that terminal before `npm ci`: `$env:NODE_EXTRA_CA_CERTS=(Resolve-Path ../backend/data/npm-ca-bundle.pem).Path`. Keep certificate verification enabled.
 
 Run `npm run build` for a production bundle and `npm run smoke` for a browser smoke test using Microsoft Edge. The smoke test mocks API responses so it does not spend model quota; it checks desktop and mobile widths, keyboard navigation, citation links, document filters and management, refusal, loading, error, and empty states. Set `CAMPUSLENS_BROWSER` to another Chromium executable path if Edge is unavailable. A local proxy check also returned `ok` from `/api/health` and loaded all 33 indexed documents from the existing backend without calling the model.
+
+## Optional local Docker setup (M6)
+
+Requires Docker Engine/Desktop with Compose v2. From the repository root:
+
+```powershell
+Copy-Item .env.example .env
+# Edit root .env: set a unique random access password (16+ characters),
+# access username, and the selected provider's key.
+docker compose up --build -d --wait
+docker compose ps
+curl.exe --fail http://localhost:8080/health
+# curl prompts for the access password; it is not placed in shell history.
+curl.exe --fail --user demo http://localhost:8080/api/documents
+```
+
+Open <http://localhost:8080/> and enter the access credentials in the browser's sign-in dialog. Replace `demo` in commands if you chose another username. The frontend uses the same origin `/api` proxy; no credentials or provider keys are compiled into the browser bundle. The root `.env` is for Compose; `backend/.env` remains the separate local development configuration. In production, provide the same variables through your hosting platform's secret/environment settings. Both files are ignored, and the Docker build context excludes them.
+
+The named `index-data` volume holds the database and corpus download cache. `docker compose down` preserves it; `docker compose down --volumes` deletes it. The backend runs as an unprivileged user and has no published port. Health checks test the API's database access and the frontend proxy without calling a provider. Compose waits for the backend health check before starting the frontend, following [Docker's startup-order guidance](https://docs.docker.com/compose/how-tos/startup-order/).
+
+Public mode refuses to start without a username and a password of at least 16 characters. All API routes except health and CORS preflight require HTTP Basic authentication, including uploads, replacement, deletion, document listings, and questions. Nginx uses the backend access check to protect the site and display the browser sign-in dialog, as described in [Nginx's auth request documentation](https://nginx.org/en/docs/http/ngx_http_auth_request_module.html). Use this as a private reviewer demo: anyone given the shared credentials can ask questions and manage documents.
+
+This repository's delivery target is local use and screenshots. Compose binds port 8080 to loopback and keeps port 8000 inaccessible. Its `public` backend mode is the existing strict-authentication setting; using it here protects the local packaged app and does not publish a public service. No hosted URL is required.
+
+The single backend process allows at most 10 authenticated write requests per rolling minute by default, shared across users and `/ask`, upload, replacement, and deletion. Override `CAMPUSLENS_REQUESTS_PER_MINUTE` to change that budget. Rejections return 429 and `Retry-After: 60`. The limiter is in memory and resets on restart; keep one worker and one replica, or replace it with a shared limiter before scaling. Bodies are bounded before parsing, including streamed requests: `/ask` allows 16 KiB, and uploads allow the 10 MiB file limit plus 64 KiB multipart overhead. Uvicorn also bounds concurrency. Authentication failures never reach model calls.
+
+To populate the deployed database, run the manifest command inside the backend container. It automatically reads the deployment access credentials from its environment:
+
+```powershell
+docker compose exec backend uv run --no-sync python -m scripts.ingest_corpus --check
+docker compose exec backend uv run --no-sync python -m scripts.ingest_corpus --api-url http://localhost:8000 --cache-dir /data/corpus --upload-delay 7
+```
+
+This ingestion uses provider quota. To rebuild after changing embedding settings, add `--force` to that command. It re-embeds and atomically replaces each manifest document while preserving its ID; rerunning normally skips unchanged files. Rebuild every document before asking with a changed embedding profile; manual uploads must be replaced separately. Avoid queries during the rebuild. Failed replacements preserve the prior document; rerun to recover. The existing M4 evaluation remains on hold and is not part of deployment verification.
+
+Use `docker compose logs --tail 100 backend` for structured JSON request/error records with request IDs, status, route category, and duration. Logs exclude request bodies, credentials, provider error text, and stack traces. Provider failures retain their sanitized API error response; unexpected failures return a generic 500. Health indicates database readiness, not provider quota availability.
+
+[CI](.github/workflows/ci.yaml) runs backend tests, frontend TypeScript checks (`npm run lint`) and build, plus a fresh Compose build/start, unauthenticated rejection, authenticated access, and restart check without provider keys. Here, `lint` checks TypeScript's strict and unused-code rules; it does not include a separate ESLint policy. Local validation passed 32 backend tests, frontend checks, and browser smoke tests. On October 3, 2026, `uv run --no-sync python -m scripts.local_setup_smoke` also started the README's local server path with a fresh temporary database and checked health, empty listings, and an empty-corpus answer without provider calls. The same smoke check and all 32 tests also passed in a new temporary virtual environment installed from the frozen backend lockfile. Frontend npm ci, lint, and build passed as well. Docker is unavailable on the development machine, so the optional container workflow remains unverified locally; local delivery does not depend on a hosted deployment.
 
 ## Live PDF smoke test
 

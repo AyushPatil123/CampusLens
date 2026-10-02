@@ -9,6 +9,10 @@ load_dotenv()
 
 @dataclass(frozen=True)
 class Settings:
+    deployment_mode: str = os.getenv("CAMPUSLENS_MODE", "local")
+    auth_username: str = os.getenv("CAMPUSLENS_AUTH_USERNAME", "")
+    auth_password: str = os.getenv("CAMPUSLENS_AUTH_PASSWORD", "")
+    requests_per_minute: int = int(os.getenv("CAMPUSLENS_REQUESTS_PER_MINUTE", "10"))
     db_path: Path = Path(os.getenv("CAMPUSLENS_DB", "data/campuslens.sqlite3"))
     model_provider: str = os.getenv("CAMPUSLENS_PROVIDER", "gemini").strip().lower()
     embedding_model: str = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")

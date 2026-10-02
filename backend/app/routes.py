@@ -1,9 +1,11 @@
 from datetime import date
+import sqlite3
 
 from fastapi import APIRouter, File, Form, UploadFile
 
 from .schemas import AskRequest, AskResponse, DocumentResponse, ErrorResponse, HealthResponse
 from .services import DocumentService
+from .errors import ServiceError
 
 
 PROVIDER_ERRORS = {429: {"model": ErrorResponse}, 502: {"model": ErrorResponse}, 503: {"model": ErrorResponse}}
@@ -12,8 +14,17 @@ PROVIDER_ERRORS = {429: {"model": ErrorResponse}, 502: {"model": ErrorResponse},
 def create_router(service: DocumentService) -> APIRouter:
     router = APIRouter()
 
+    @router.get("/access", include_in_schema=False)
+    def access():
+        return {"status": "ok"}
+
     @router.get("/health", response_model=HealthResponse)
     def health():
+        try:
+            with service.store.connect() as db:
+                db.execute("SELECT COUNT(*) FROM documents").fetchone()
+        except sqlite3.Error:
+            raise ServiceError(503, "Database unavailable") from None
         return {"status": "ok"}
 
     @router.get("/documents", response_model=list[DocumentResponse])

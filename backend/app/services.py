@@ -59,7 +59,8 @@ class DocumentService:
             raise ServiceError(413, "File exceeds 10 MB limit")
         sha256 = hashlib.sha256(data).hexdigest()
         if existing := self.store.by_hash(sha256):
-            raise ServiceError(409, f"Document already uploaded: {existing['id']}")
+            if existing["id"] != document_id:
+                raise ServiceError(409, f"Document already uploaded: {existing['id']}")
         try:
             extraction = extract_pages(filename, data)
             chunks = chunk_pages(extraction.pages, self.settings.chunk_size, self.settings.chunk_overlap)

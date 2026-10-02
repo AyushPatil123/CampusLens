@@ -180,6 +180,8 @@ def test_corpus_sync_adds_skips_and_replaces_by_source_hash(tmp_path):
     assert first["source_url"] == url
     assert first["sha256"]
     assert sync_corpus(entries, api, source, cache)["unchanged"] == 1
+    assert sync_corpus(entries, api, source, cache, force=True)["replaced"] == 1
+    assert api.get("/documents").json()[0]["id"] == first["id"]
     current[0] = make_pdf("Tuition is due on September 1")
     assert sync_corpus(entries, api, source, cache)["replaced"] == 1
     updated = api.get("/documents").json()[0]

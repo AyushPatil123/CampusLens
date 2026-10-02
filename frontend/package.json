@@ -4,6 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "lint": "tsc --noEmit",
+    "screenshots": "node scripts/screenshots.mjs",
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",

@@ -1,0 +1,46 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      CAMPUSLENS_MODE: public
+      CAMPUSLENS_AUTH_USERNAME: ${CAMPUSLENS_AUTH_USERNAME:?Set an access username in .env}
+      CAMPUSLENS_AUTH_PASSWORD: ${CAMPUSLENS_AUTH_PASSWORD:?Set a strong access password in .env}
+      CAMPUSLENS_PROVIDER: ${CAMPUSLENS_PROVIDER:-gemini}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-gemini-embedding-001}
+      GEMINI_ANSWER_MODEL: ${GEMINI_ANSWER_MODEL:-gemini-3.8-flash}
+      GEMINI_EMBEDDING_DIMENSIONS: ${GEMINI_EMBEDDING_DIMENSIONS:-768}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      OPENAI_ANSWER_MODEL: ${OPENAI_ANSWER_MODEL:-gpt-4.1-mini}
+      CAMPUSLENS_REQUESTS_PER_MINUTE: ${CAMPUSLENS_REQUESTS_PER_MINUTE:-10}
+      CAMPUSLENS_DB: /data/campuslens.sqlite3
+      CAMPUSLENS_CORS_ORIGINS: ""
+    volumes:
+      - index-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, /app/.venv/bin/python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "127.0.0.1:${CAMPUSLENS_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1/health]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+volumes:
+  index-data:
