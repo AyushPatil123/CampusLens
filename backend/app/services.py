@@ -62,7 +62,7 @@ class DocumentService:
             if existing["id"] != document_id:
                 raise ServiceError(409, f"Document already uploaded: {existing['id']}")
         try:
-            extraction = extract_pages(filename, data)
+            extraction = extract_pages(filename, data, settings=self.settings)
             chunks = chunk_pages(extraction.pages, self.settings.chunk_size, self.settings.chunk_overlap)
         except ValueError as exc:
             raise ServiceError(422, str(exc)) from exc

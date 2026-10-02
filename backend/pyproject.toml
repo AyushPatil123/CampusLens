@@ -6,6 +6,7 @@ dependencies = ["fastapi>=0.115,<1", "uvicorn[standard]>=0.30,<1", "python-multi
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<10"]
+ocr = ["pypdfium2>=4.30,<6", "Pillow>=11,<13"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

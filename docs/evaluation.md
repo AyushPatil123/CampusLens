@@ -67,6 +67,8 @@ The reviewed sources and gold pages are indexed, so these examples provide no ev
 
 ## Answer review status
 
+An independent [extraction/chunking comparison](ingestion-validation.md#extraction-upgrade-2026-10-03) on October 3, 2026 retained the same 33 PDFs and 57 pages, with chunks increasing from 189 to 228. Keyword Hit@5 stayed at 50/50, MRR@10 rose from 0.9133 to 0.9167, and two-document coverage rose from 7/8 to 8/8. That comparison used temporary keyword indexes and no providers. It does not replace the dense/hybrid baseline or answer review; the existing indexed chunks and saved results were preserved.
+
 M4's [rubric, sample, partial counts, and quota limitation](answer-evaluation.md) are tracked separately. The M3 retrieval numbers above do not measure whether generated answers are supported or whether cited excerpts prove their claims.
 
 The M4 Q048 failure motivated a separate `hybrid_diverse` mode that caps context at two chunks per document. In a [matched rerun](../eval/diversity_results.json) on 2026-10-02, both original hybrid and diverse hybrid had 50/50 Hit@5 and 0.9367 MRR@10; two-document coverage rose from 7/8 to 8/8. Same-run p50 retrieval was 241.279 ms versus 226.343 ms, respectively. These timing values are much higher than the earlier local run, so the data support a coverage improvement but not a stable latency claim. `/ask` now uses diverse hybrid; the fixed answer baseline remains pinned to original hybrid for the eventual before/after comparison.

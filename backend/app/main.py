@@ -11,6 +11,7 @@ from .routes import create_router
 from .services import DocumentService
 from .store import Store
 from .security import AccessMiddleware
+from .ocr import validate_ocr_settings
 
 
 def create_app(settings: Settings | None = None, provider: ModelProvider | None = None) -> FastAPI:
@@ -26,6 +27,7 @@ def create_app(settings: Settings | None = None, provider: ModelProvider | None 
     if settings.requests_per_minute < 1:
         raise ValueError("Request limit must be positive")
     chunk_pages([], settings.chunk_size, settings.chunk_overlap)
+    validate_ocr_settings(settings)
     service = DocumentService(settings, Store(settings.db_path), ModelGateway(settings, provider))
     app = FastAPI(title="CampusLens API", version="0.1.0")
     app.add_middleware(AccessMiddleware, settings=settings)

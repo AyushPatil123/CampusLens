@@ -9,7 +9,8 @@ jobs:
         with:
           version: "0.8.22"
           python-version: "3.12"
-      - run: uv sync --frozen --extra dev
+      - run: sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-eng
+      - run: uv sync --frozen --extra dev --extra ocr
         working-directory: backend
       - run: uv run --no-sync pytest
         working-directory: backend

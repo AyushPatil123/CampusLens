@@ -23,6 +23,11 @@ class Settings:
     max_upload_bytes: int = 10 * 1024 * 1024
     chunk_size: int = int(os.getenv("CAMPUSLENS_CHUNK_SIZE", "900"))
     chunk_overlap: int = int(os.getenv("CAMPUSLENS_CHUNK_OVERLAP", "120"))
+    ocr_enabled: bool = os.getenv("CAMPUSLENS_OCR_ENABLED", "false").strip().lower() in {"true", "1", "yes"}
+    ocr_language: str = os.getenv("CAMPUSLENS_OCR_LANGUAGE", "eng")
+    ocr_command: str = os.getenv("CAMPUSLENS_OCR_COMMAND", "tesseract")
+    ocr_max_pages: int = int(os.getenv("CAMPUSLENS_OCR_MAX_PAGES", "10"))
+    ocr_timeout_seconds: int = int(os.getenv("CAMPUSLENS_OCR_TIMEOUT_SECONDS", "10"))
     cors_origins: tuple[str, ...] = tuple(
         origin.strip() for origin in os.getenv(
             "CAMPUSLENS_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"

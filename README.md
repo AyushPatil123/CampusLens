@@ -19,7 +19,9 @@ Regenerate all three screenshots from `frontend/` with `npm ci` and `npm run scr
 ```mermaid
 flowchart LR
     A[Official PDFs or local text uploads] --> B[Extraction with PDF page numbers]
-    B --> C[Chunks: 900 characters / 120 overlap]
+    B --> C[Paragraph/sentence chunks: 900 characters / 120 overlap]
+    B --> O[Textless pages: optional local OCR]
+    O --> C
     C --> D[Provider embeddings]
     C --> E[SQLite FTS5 keyword index]
     D --> F[SQLite stored vectors and metadata]
@@ -31,7 +33,7 @@ flowchart LR
     T --> U[React answer / citations / source page links]
 ```
 
-PDF page identity and original URLs survive extraction, storage, retrieval, and answer generation so readers can inspect the evidence. SQLite keeps the corpus and both retrieval paths in one persistent store; this 189-chunk corpus does not yet justify a vector database. Keyword retrieval handles exact policy terms, while dense retrieval supports paraphrases. Reciprocal rank fusion combines their rankings. Production context limits repeated chunks from one document after a measured multi-document coverage failure. The API returns a refusal when it cannot verify citation numbers; that check does not prove every claim is supported, which is why answer support is reviewed separately.
+PDF page identity and original URLs survive extraction, storage, retrieval, and answer generation so readers can inspect the evidence. Cleanup preserves paragraph/line breaks, and chunking prefers paragraph and sentence boundaries. Optional local OCR handles pages without extractable text. SQLite keeps the corpus and both retrieval paths in one persistent store; the measured 189-chunk baseline does not yet justify a vector database. Keyword retrieval handles exact policy terms, while dense retrieval supports paraphrases. Reciprocal rank fusion combines their rankings. Production context limits repeated chunks from one document after a measured multi-document coverage failure. The API returns a refusal when it cannot verify citation numbers; that check does not prove every claim is supported, which is why answer support is reviewed separately.
 
 ## Measured results and limits
 
@@ -45,7 +47,9 @@ The September 27, 2026 baseline used the same 33-document snapshot and 60 fixed 
 
 Hybrid improved MRR by 0.0234 over keyword search while adding about 54.6 ms at p50. These single-run local timings exclude query embedding, HTTP, and answer generation. In a separate matched October 2 run, limiting hybrid context to two chunks per document improved two-document coverage from 7/8 to 8/8 without changing Hit@5 or MRR; timing varied substantially between runs. See [the method and weak-case review](docs/evaluation.md) and [raw baseline results](eval/baseline_results.json).
 
-This focused corpus and questions written from known memos limit generalization. PDFs are historical (2013–2022), may be superseded, and are downloaded rather than redistributed. Scans need OCR; retrieval scans stored vectors and has not been load-tested at large scale. Answer evaluation remains incomplete: 26/30 baseline responses are reviewed, with 17/20 answerable responses fully supported and 17/20 with citations supporting every material claim. Six reviewed no-answer cases refused correctly; four remain unrun, and the same-sample revised-answer comparison is on hold for quota. See [the answer rubric and partial findings](docs/answer-evaluation.md). The screenshots demonstrate presentation, not model quality.
+This focused corpus and questions written from known memos limit generalization. PDFs are historical (2013–2022), may be superseded, and are downloaded rather than redistributed. OCR is optional and can misread text; table relationships are not reconstructed. Retrieval scans stored vectors and has not been load-tested at large scale. Answer evaluation remains incomplete: 26/30 baseline responses are reviewed, with 17/20 answerable responses fully supported and 17/20 with citations supporting every material claim. Six reviewed no-answer cases refused correctly; four remain unrun, and the same-sample revised-answer comparison is on hold for quota. See [the answer rubric and partial findings](docs/answer-evaluation.md). The screenshots demonstrate presentation, not model quality.
+
+An October 3 extraction/chunking comparison on the same cached PDF hashes retained all 57 indexed pages and produced 228 chunks versus the baseline's 189. Keyword Hit@5 remained 50/50, MRR@10 changed from 0.9133 to 0.9167, and both required documents appeared in the top five for 8/8 questions versus 7/8. This is a **keyword-only** check, not a new dense/hybrid or answer evaluation. Existing databases and baseline results were left intact. See [the extraction comparison](docs/ingestion-validation.md#extraction-upgrade-2026-10-03).
 
 [Portfolio notes](docs/portfolio.md) contain a resume bullet based on these measured results, a two-minute explanation of the hybrid-search tradeoff, and a five-minute repository tour.
 
@@ -66,6 +70,44 @@ uv run uvicorn app.main:app --reload
 
 Open <http://127.0.0.1:8000/docs> for the interactive API and its response schemas. The SQLite database is created at `backend/data/campuslens.sqlite3` by default. `.env`, downloaded PDFs, and the database are ignored by Git. To use OpenAI, set `CAMPUSLENS_PROVIDER=openai` and `OPENAI_API_KEY` in `.env` instead. Changing the embedding provider or model requires replacing or re-uploading documents; `/ask` returns 409 for an index built with a different embedding profile. The local frontend origins default to `http://localhost:5173` and `http://127.0.0.1:5173`; override them with the comma-separated `CAMPUSLENS_CORS_ORIGINS` setting.
 
+## Optional OCR and extraction settings
+
+Normal text PDFs and UTF-8 files work with the standard installation. To read image-only PDF pages, install the optional Python dependencies and the local [Tesseract engine and language data](https://tesseract-ocr.github.io/tessdoc/Installation.html). OCR uses your machine's CPU; it sends no images to a model provider.
+
+From `backend/` on Windows:
+
+```powershell
+uv sync --frozen --extra dev --extra ocr --native-tls
+winget install --id UB-Mannheim.TesseractOCR --exact --source winget
+```
+
+Set these in `backend/.env`, then restart the backend:
+
+```dotenv
+CAMPUSLENS_OCR_ENABLED=true
+CAMPUSLENS_OCR_LANGUAGE=eng
+# Use the actual installation path if Tesseract is not on PATH.
+CAMPUSLENS_OCR_COMMAND=C:/Program Files/Tesseract-OCR/tesseract.exe
+CAMPUSLENS_OCR_MAX_PAGES=10
+CAMPUSLENS_OCR_TIMEOUT_SECONDS=10
+```
+
+On Debian/Ubuntu install `tesseract-ocr` and `tesseract-ocr-eng`; on macOS use `brew install tesseract`. Leave `CAMPUSLENS_OCR_COMMAND=tesseract` when the executable is on PATH. Additional languages require their Tesseract trained data; for example, `eng+hin` needs both English and Hindi installed. The Docker backend includes English Tesseract and the Python OCR extra; enable OCR in the root `.env` and recreate the service with `docker compose up --build -d --wait`.
+
+OCR runs only on pages with **no cleaned extractable text**. Text-layer pages, including scans with an existing OCR layer, keep their text; quality warnings do not trigger automatic OCR or word repair. Each recovered page keeps its original PDF page number and a warning to verify names, dates, and values. A genuinely blank page can still have no text after OCR. A fully unreadable PDF is rejected. Missing dependencies/engine, recognition failure, or a timeout rejects ingestion before embedding, leaving the old index unchanged on replacement.
+
+Default OCR bounds are ten pages per upload, ten seconds of recognition per page, 200 DPI, and twelve million rendered pixels per page. `CAMPUSLENS_OCR_MAX_PAGES` accepts 1–100, and timeout accepts 1–60 seconds. These bound OCR work but are not a whole-request deadline; PDF parsing/rendering and queued work add time. Large scans should be split into smaller files. Tables, reading order, handwriting, and imperfect OCR still need manual review. [PDFium's thread-safety requirement](https://pypdfium2-team.github.io/pypdfium2/python_api.html) is handled with a rendering lock.
+
+Text cleanup normalizes Unicode/whitespace and removes soft hyphens, zero-width spaces, and stray controls while retaining line and paragraph breaks. It does not guess missing words, join ordinary hyphenated line endings, or change dates and amounts. Warnings flag control/replacement characters and unusually fragmented single-letter text; these are heuristics, not a guarantee of good extraction. Chunks stay within one page and prefer paragraph, sentence, then word boundaries; unusually long tokens are split to respect the size limit. The default maximum is 900 characters including retained whitespace, with up to 120 characters of whole-word overlap.
+
+Existing documents retain their stored chunks. To adopt the new extraction/chunking, use the existing manifest command with `--force` or replace a manual upload. Rebuilding consumes embedding quota; it is not done automatically, and the saved M3/M4 baselines remain unchanged. To repeat the provider-free cached-corpus comparison from `backend/`:
+
+```powershell
+uv run --no-sync python -m scripts.evaluate_extraction
+```
+
+This requires PDFs already cached by manifest ingestion with hashes matching `eval/corpus_snapshot.json`. It creates temporary keyword indexes and writes `eval/extraction_results.json`; it does not call embeddings, OCR, or answer models. `scripts.inspect_corpus --ocr` can inspect extraction including empty-page OCR before embedding.
+
 ## API
 
 | Endpoint | Purpose |
@@ -77,7 +119,7 @@ Open <http://127.0.0.1:8000/docs> for the interactive API and its response schem
 | `DELETE /documents/{id}` | Delete a document and its search index entries |
 | `POST /ask` | Ask `{ "question": "When is tuition due?" }` |
 
-Run tests with `uv run --no-sync pytest`. Scanned PDFs need OCR and are rejected if no text can be extracted. Local mode is intended for loopback development. The Compose deployment enables password protection and request limits.
+Run tests with `uv run --no-sync pytest`. OCR tests needing Python extras skip when those extras are absent; the real recognition test additionally needs Tesseract. CI installs both and exercises an image-only PDF. Local mode is intended for loopback development. The Compose deployment enables password protection and request limits.
 
 `POST /ask` also accepts optional exact-match `institution` and `document_ids` filters. They constrain both keyword and embedding retrieval before the answer is generated. `GET /documents` includes each file's SHA-256 so the corpus command can skip unchanged files.
 

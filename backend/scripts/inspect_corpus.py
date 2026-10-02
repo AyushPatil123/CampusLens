@@ -1,12 +1,14 @@
 """Check PDF extraction and empty pages before paying for embeddings."""
 
 import argparse
+from dataclasses import replace
 from pathlib import Path
 
 import httpx
 import truststore
 
 from app.documents import extract_pages
+from app.config import Settings
 from scripts.ingest_corpus import DEFAULT_MANIFEST, download_pdf, load_manifest
 
 
@@ -14,7 +16,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=str, default=str(DEFAULT_MANIFEST))
     parser.add_argument("--all", action="store_true", help="Inspect every manifest entry")
+    parser.add_argument("--ocr", action=argparse.BooleanOptionalAction, default=None, help="Override configured OCR for empty pages")
     args = parser.parse_args()
+    settings = Settings()
+    if args.ocr is not None:
+        settings = replace(settings, ocr_enabled=args.ocr)
     entries = load_manifest(Path(args.manifest))
     selected = entries if args.all else [entries[i] for i in sorted({0, len(entries) // 4, len(entries) // 2, 3 * len(entries) // 4, len(entries) - 1})]
     truststore.inject_into_ssl()
@@ -23,7 +29,7 @@ def main() -> int:
         for entry in selected:
             try:
                 data = download_pdf(source, entry["source_url"])
-                result = extract_pages("source.pdf", data)
+                result = extract_pages("source.pdf", data, settings=settings)
                 nonempty = [(number, text) for number, text in result.pages if text.strip()]
                 if not nonempty:
                     raise ValueError("No extractable text")
